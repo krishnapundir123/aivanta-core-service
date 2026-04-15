@@ -1,0 +1,458 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ============== CORE ENTITIES ==============
+
+enum UserRole {
+  CLIENT_ADMIN
+  ADMIN_3SC
+  DELIVERY_USER
+}
+
+enum TicketStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users     User[]
+  tickets   Ticket[]
+  documents Document[]
+  openPoints OpenPoint[]
+  patterns  RecurrentPattern[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          UserRole
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  tenantId      String?   @map("tenant_id")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  assignedTickets Ticket[] @relation("AssignedTickets")
+  requestedTickets Ticket[] @relation("RequestedTickets")
+  messages      Message[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  copilotSessions CopilotSession[]
+  reportDefinitions ReportDefinition[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  refreshToken String    @unique @map("refresh_token")
+  expiresAt    DateTime  @map("expires_at")
+  ipAddress    String?   @map("ip_address")
+  userAgent    String?   @map("user_agent")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  revokedAt    DateTime? @map("revoked_at")
+
+  // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ============== TICKET SYSTEM ==============
+
+model Ticket {
+  id          String       @id @default(uuid())
+  tenantId    String       @map("tenant_id")
+  title       String
+  description String
+  status      TicketStatus @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  category    String?
+  tags        String[]
+  
+  // Assignment
+  assigneeId  String?      @map("assignee_id")
+  requesterId String       @map("requester_id")
+  
+  // AI Features
+  embedding   Unsupported("vector(1536)")?
+  aiTriage    Json?        @map("ai_triage")
+  aiSummary   String?      @map("ai_summary")
+  
+  // SLA
+  slaDeadline DateTime?    @map("sla_deadline")
+  slaPausedAt DateTime?    @map("sla_paused_at")
+  slaPausedReason String?  @map("sla_paused_reason")
+  
+  // Metrics
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  resolvedAt  DateTime?    @map("resolved_at")
+  closedAt    DateTime?    @map("closed_at")
+  timeToAcknowledge Int?   @map("time_to_acknowledge") // in seconds
+  timeToResolve Int?       @map("time_to_resolve") // in seconds
+  
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  assignee    User?        @relation("AssignedTickets", fields: [assigneeId], references: [id])
+  requester   User         @relation("RequestedTickets", fields: [requesterId], references: [id])
+  messages    Message[]
+  documents   DocumentTicketLink[]
+  similarTickets Json?     @map("similar_tickets") // Array of {ticketId, similarity}
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([createdAt])
+  // HNSW index on embedding is created via raw SQL migration (Prisma 5.22 does not support Hnsw index type in schema)
+  @@map("tickets")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  ticketId    String   @map("ticket_id")
+  authorId    String   @map("author_id")
+  content     String
+  embedding   Unsupported("vector(1536)")?
+  visibility  String   @default("public") // public, internal
+  parentId    String?  @map("parent_id")
+  
+  // AI Generated
+  isAiGenerated Boolean @default(false) @map("is_ai_generated")
+  aiModel     String?  @map("ai_model")
+  
+  // Attachments
+  attachments Json?    // Array of {filename, storageKey, mimeType}
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author      User     @relation(fields: [authorId], references: [id])
+  parent      Message? @relation("ThreadReplies", fields: [parentId], references: [id])
+  replies     Message[] @relation("ThreadReplies")
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// ============== DOCUMENT INTELLIGENCE ==============
+
+enum DocumentType {
+  BRD
+  SOW
+  TECHNICAL_SPEC
+  USER_MANUAL
+  CONTRACT
+  OTHER
+}
+
+model Document {
+  id            String       @id @default(uuid())
+  tenantId      String       @map("tenant_id")
+  filename      String
+  storageKey    String       @map("storage_key")
+  mimeType      String       @map("mime_type")
+  sizeBytes     Int          @map("size_bytes")
+  documentType  DocumentType @map("document_type")
+  version       Int          @default(1)
+  
+  // Content
+  parsedContent String?      @map("parsed_content")
+  summary       String?
+  
+  // Metadata
+  uploadedBy    String       @map("uploaded_by")
+  
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  sections      DocumentSection[]
+  ticketLinks   DocumentTicketLink[]
+
+  @@index([tenantId])
+  @@index([documentType])
+  @@map("documents")
+}
+
+model DocumentSection {
+  id          String   @id @default(uuid())
+  documentId  String   @map("document_id")
+  sectionPath String   @map("section_path") // e.g., "1.2.3"
+  title       String
+  content     String
+  embedding   Unsupported("vector(1536)")?
+  
+  // Requirements traceability
+  requirements Json?   // Array of {id, description, status, linkedTicketIds}
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  // HNSW index on embedding is created via raw SQL migration (Prisma 5.22 does not support Hnsw index type in schema)
+  @@map("document_sections")
+}
+
+model DocumentTicketLink {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  ticketId   String   @map("ticket_id")
+  linkedBy   String   @map("linked_by")
+  linkType   String   @default("reference") // reference, implements, blocks
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, ticketId])
+  @@map("document_ticket_links")
+}
+
+// ============== AI FEATURES ==============
+
+model CopilotSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  context   Json     @default("{}") // Active filters, selected tickets, etc.
+  messages  Json[]   @default([]) // Array of {role, content, timestamp, actions}
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("copilot_sessions")
+}
+
+model AssistantSession {
+  id               String    @id @default(uuid())
+  customerEmail    String    @map("customer_email")
+  tenantId         String    @map("tenant_id")
+  messages         Json[]    @default([])
+  
+  // Metrics
+  deflectionCount  Int       @default(0) @map("deflection_count")
+  ticketCreated    Boolean   @default(false) @map("ticket_created")
+  ticketId         String?   @map("ticket_id")
+  
+  // Feedback
+  rating           Int?      // 1-5
+  feedback         String?
+  
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([customerEmail])
+  @@map("assistant_sessions")
+}
+
+model RecurrentPattern {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  patternName   String   @map("pattern_name")
+  description   String
+  rootCause     String?  @map("root_cause")
+  confidence    Float
+  
+  // Tickets in this pattern
+  ticketIds     String[] @map("ticket_ids")
+  
+  // Analysis
+  frequency30d  Int      @map("frequency_30d")
+  trend         String   // increasing, stable, decreasing
+  suggestedFix  String?  @map("suggested_fix")
+  
+  // Clustering
+  clusterCenter Unsupported("vector(1536)")? @map("cluster_center")
+  
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("recurrent_patterns")
+}
+
+// ============== PROJECT MANAGEMENT ==============
+
+model OpenPoint {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  projectId      String    @map("project_id")
+  title          String
+  description    String?
+  status         String    // not_started, in_progress, blocked, completed
+  priority       String    // low, medium, high, critical
+  
+  // Assignment
+  assignedDl     String?   @map("assigned_dl") // Delivery lead
+  clientPoc      String?   @map("client_poc") // Client point of contact
+  
+  // Timeline
+  startDate      DateTime? @map("start_date")
+  dueDate        DateTime? @map("due_date")
+  completedAt    DateTime? @map("completed_at")
+  
+  // Time tracking
+  estimatedHours Int?      @map("estimated_hours")
+  actualHours    Int       @default(0) @map("actual_hours")
+  
+  // Gantt data
+  ganttData      Json?     @map("gantt_data") // {dependencies, milestones, progress}
+  
+  // AI
+  aiRiskScore    Float?    @map("ai_risk_score") // 0-1
+  
+  // Linked tickets
+  linkedTickets  Json?     @map("linked_tickets") // Array of ticketIds
+  
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([status])
+  @@map("open_points")
+}
+
+// ============== ANALYTICS & REPORTS ==============
+
+model ReportDefinition {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  tenantId        String?  @map("tenant_id")
+  name            String
+  description     String?
+  
+  // Configuration
+  dataSource      String   @map("data_source") // tickets, documents, open_points, etc.
+  filters         Json     @default("{}")
+  visualizations  Json     @default("[]") // Array of chart configs
+  
+  // AI Generated
+  aiNarrative     String?  @map("ai_narrative")
+  
+  // Sharing
+  isShared        Boolean  @default(false) @map("is_shared")
+  
+  // Schedule
+  schedule        Json?    // {frequency: daily|weekly|monthly, recipients: []}
+  lastRunAt       DateTime? @map("last_run_at")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("report_definitions")
+}
+
+// ============== AUDIT & COMPLIANCE ==============
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============== SLA CONFIGURATION ==============
+
+model SlaConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?  @map("tenant_id") // null = global default
+  
+  // Response times by priority (in minutes)
+  lowResponse     Int      @default(480) @map("low_response") // 8 hours
+  mediumResponse  Int      @default(240) @map("medium_response") // 4 hours
+  highResponse    Int      @default(60) @map("high_response") // 1 hour
+  criticalResponse Int     @default(15) @map("critical_response")
+  
+  // Resolution times by priority
+  lowResolution   Int      @default(2880) @map("low_resolution") // 2 days
+  mediumResolution Int     @default(1440) @map("medium_resolution") // 1 day
+  highResolution  Int      @default(480) @map("high_resolution") // 8 hours
+  criticalResolution Int   @default(240) @map("critical_resolution") // 4 hours
+  
+  // Business hours
+  businessHours   Json     @default("{\"mon\":[9,17],\"tue\":[9,17],\"wed\":[9,17],\"thu\":[9,17],\"fri\":[9,17]}") @map("business_hours")
+  timezone        String   @default("UTC")
+  holidays        Json     @default("[]") // Array of "YYYY-MM-DD"
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId])
+  @@map("sla_configs")
+}
