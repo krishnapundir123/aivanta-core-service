@@ -1,6 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -35,6 +36,8 @@ enum TicketPriority {
 model Tenant {
   id        String   @id @default(uuid())
   name      String
+  slug      String   @unique   // ✅ ADD THIS
+  domain    String?  @unique   // ✅ optional but useful
   settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

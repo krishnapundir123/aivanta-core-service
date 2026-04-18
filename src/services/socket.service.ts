@@ -2,7 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { redis, redisSubscriber } from '../config/redis';
+import { redis, redisSubscriber, isRedisAvailable } from '../config/redis';
 import logger from '../shared/utils/logger';
 
 interface AuthenticatedSocket extends Socket {
@@ -133,7 +133,8 @@ export class SocketService {
   }
 
   private setupRedisSubscriber(): void {
-    // Subscribe to Redis events for cross-server broadcasting
+    if (!isRedisAvailable) return;
+
     redisSubscriber.subscribe('ticket:message', 'ticket:update', 'notification:new');
     
     redisSubscriber.on('message', (channel, message) => {

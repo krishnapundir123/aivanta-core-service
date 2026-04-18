@@ -18,14 +18,16 @@ export interface UpdateTicketInput {
   priority?: TicketPriority;
   category?: string;
   tags?: string[];
-  assigneeId?: string | null;
+  assigneeId?: string;
   aiTriage?: Record<string, unknown>;
   aiSummary?: string;
   slaDeadline?: Date;
+  acknowledgedAt?: Date;
   resolvedAt?: Date;
   closedAt?: Date;
   timeToAcknowledge?: number;
   timeToResolve?: number;
+  similarTickets?: unknown;
 }
 
 export interface TicketFilters {
@@ -126,7 +128,7 @@ export const ticketsRepository = {
   async update(id: string, data: UpdateTicketInput) {
     return prisma.ticket.update({
       where: { id },
-      data,
+      data: data as any,
       include: {
         assignee: {
           select: { id: true, email: true, firstName: true, lastName: true },
@@ -173,6 +175,15 @@ export const ticketsRepository = {
       SET embedding = ${embeddingString}::vector
       WHERE id = ${id}
     `;
+  },
+
+  async getEmbedding(id: string): Promise<number[] | null> {
+    const result = await prisma.$queryRaw<Array<{ embedding: string | null }>>`
+      SELECT embedding::text as embedding FROM tickets WHERE id = ${id}
+    `;
+    const text = result[0]?.embedding;
+    if (!text) return null;
+    return text.replace(/[\[\]]/g, '').split(',').map(Number);
   },
 
   async getTicketStats(tenantId: string) {

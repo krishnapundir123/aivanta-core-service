@@ -107,7 +107,7 @@ export const documentsRepository = {
     sectionPath: string;
     title: string;
     content: string;
-    requirements?: unknown;
+    requirements?: Prisma.InputJsonValue;
   }) {
     return prisma.documentSection.create({
       data,

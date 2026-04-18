@@ -16,6 +16,7 @@ import copilotRoutes from './modules/copilot/copilot.routes';
 import assistantRoutes from './modules/assistant/assistant.routes';
 import documentsRoutes from './modules/documents/documents.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import aiRoutes from './modules/ai/ai.routes';
 
 const app = express();
 
@@ -33,11 +34,12 @@ app.use(helmet({
 
 // CORS
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -75,6 +77,7 @@ app.use('/api/v1/ai/copilot', copilotRoutes);
 app.use('/api/v1/assistant', assistantRoutes);
 app.use('/api/v1/documents', documentsRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 // 404 handler
 app.use((_req, res) => {

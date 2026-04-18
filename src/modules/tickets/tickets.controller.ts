@@ -20,15 +20,16 @@ const updateTicketSchema = z.object({
   priority: z.nativeEnum(TicketPriority).optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  assigneeId: z.string().uuid().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable().transform(v => v ?? undefined),
 });
 
 const listTicketsQuerySchema = z.object({
   page: z.string().transform(Number).default('1'),
   limit: z.string().transform(Number).default('20'),
-  status: z.nativeEnum(TicketStatus).optional(),
-  priority: z.nativeEnum(TicketPriority).optional(),
-  search: z.string().optional(),
+  status: z.string().optional().transform(v => v || undefined).pipe(z.nativeEnum(TicketStatus).optional()),
+  priority: z.string().optional().transform(v => v || undefined).pipe(z.nativeEnum(TicketPriority).optional()),
+  category: z.string().optional().transform(v => v || undefined),
+  search: z.string().optional().transform(v => v || undefined),
 });
 
 export const ticketsController = {
@@ -61,10 +62,10 @@ export const ticketsController = {
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const ticket = await ticketsService.getTicketById(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -84,6 +85,7 @@ export const ticketsController = {
         tenantId: req.user!.tenantId,
         status: queryValidation.data.status,
         priority: queryValidation.data.priority,
+        category: queryValidation.data.category,
         search: queryValidation.data.search,
       },
       {
@@ -108,11 +110,11 @@ export const ticketsController = {
     }
 
     const ticket = await ticketsService.updateTicket(
-      req.params.id,
+      req.params.id!,
       validation.data,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -122,7 +124,7 @@ export const ticketsController = {
   }),
 
   delete: asyncHandler(async (req: Request, res: Response) => {
-    await ticketsService.deleteTicket(req.params.id, req.user!.id, req.user!.role);
+    await ticketsService.deleteTicket(req.params.id!, req.user!.id, req.user!.role);
 
     res.json({
       success: true,
@@ -132,10 +134,10 @@ export const ticketsController = {
 
   runAiTriage: asyncHandler(async (req: Request, res: Response) => {
     const result = await ticketsService.runAiTriage(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -146,10 +148,10 @@ export const ticketsController = {
 
   getSimilar: asyncHandler(async (req: Request, res: Response) => {
     const similar = await ticketsService.getSimilarTickets(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({

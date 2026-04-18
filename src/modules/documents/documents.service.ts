@@ -187,7 +187,7 @@ export const documentsService = {
         }
 
         sectionCounter++;
-        const title = headerMatch[2].replace(/<[^>]+>/g, '').trim();
+        const title = headerMatch[2]!.replace(/<[^>]+>/g, '').trim();
         currentSection = {
           path: sectionCounter.toString(),
           title,

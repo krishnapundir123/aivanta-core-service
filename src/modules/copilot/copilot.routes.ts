@@ -1,5 +1,6 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { authenticate } from '../../shared/middleware/authentication';
 import { asyncHandler } from '../../shared/utils/async-handler';
@@ -21,8 +22,8 @@ const actionSchema = z.object({
   params: z.record(z.unknown()).default({}),
 });
 
-// Copilot query endpoint
-router.post('/query', asyncHandler(async (req, res) => {
+// Copilot query handler
+async function handleCopilotQuery(req: Request, res: Response) {
   const validation = querySchema.safeParse(req.body);
   if (!validation.success) {
     throw new ValidationError('Invalid request');
@@ -43,7 +44,7 @@ router.post('/query', asyncHandler(async (req, res) => {
     session = await prisma.copilotSession.create({
       data: {
         userId,
-        context,
+        context: context as Prisma.InputJsonValue,
         messages: [],
       },
     });
@@ -62,8 +63,8 @@ router.post('/query', asyncHandler(async (req, res) => {
   await prisma.copilotSession.update({
     where: { id: session.id },
     data: {
-      messages: updatedMessages as unknown[],
-      context: { ...session.context as Record<string, unknown>, ...response.context },
+      messages: updatedMessages as Prisma.InputJsonValue[],
+      context: { ...(session.context as Record<string, unknown>), ...response.context } as Prisma.InputJsonValue,
     },
   });
 
@@ -74,7 +75,13 @@ router.post('/query', asyncHandler(async (req, res) => {
       sessionId: session.id,
     },
   });
-}));
+}
+
+// Copilot query endpoint (root path — mirrors /query)
+router.post('/', asyncHandler(handleCopilotQuery));
+
+// Copilot query endpoint
+router.post('/query', asyncHandler(handleCopilotQuery));
 
 // Execute action endpoint
 router.post('/action', asyncHandler(async (req, res) => {

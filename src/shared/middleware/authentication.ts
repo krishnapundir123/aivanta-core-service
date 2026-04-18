@@ -30,13 +30,13 @@ interface JWTPayload {
 
 export function generateTokens(payload: Omit<JWTPayload, 'iat' | 'exp'>) {
   const accessToken = jwt.sign(payload, config.jwt.secret, {
-    expiresIn: config.jwt.accessExpiration,
+    expiresIn: config.jwt.accessExpiration as any,
   });
 
   const refreshToken = jwt.sign(
     { userId: payload.userId },
     config.jwt.refreshSecret,
-    { expiresIn: config.jwt.refreshExpiration }
+    { expiresIn: config.jwt.refreshExpiration as any }
   );
 
   return { accessToken, refreshToken };

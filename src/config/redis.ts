@@ -1,23 +1,48 @@
 import Redis from 'ioredis';
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+const MAX_RETRY_ATTEMPTS = 5;
+
+export let isRedisAvailable = false;
 
 export const redis = new Redis(redisUrl, {
   retryStrategy: (times) => {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
+    if (times >= MAX_RETRY_ATTEMPTS) {
+      isRedisAvailable = false;
+      return null; // stop retrying
+    }
+    return Math.min(times * 200, 2000);
   },
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: false,
 });
 
-export const redisSubscriber = new Redis(redisUrl);
+export const redisSubscriber = new Redis(redisUrl, {
+  retryStrategy: (times) => {
+    if (times >= MAX_RETRY_ATTEMPTS) return null;
+    return Math.min(times * 200, 2000);
+  },
+});
+
+redisSubscriber.on('error', () => {
+  // suppress unhandled error events; redis.on('error') already logs
+});
 
 redis.on('connect', () => {
+  isRedisAvailable = true;
   console.log('✅ Redis connected');
 });
 
+redis.on('close', () => {
+  isRedisAvailable = false;
+});
+
 redis.on('error', (err) => {
-  console.error('❌ Redis error:', err);
+  isRedisAvailable = false;
+  const msg = err.message || (err as NodeJS.ErrnoException).code || String(err);
+  console.error('❌ Redis unavailable:', msg);
 });
 
 // Session management helpers
@@ -47,16 +72,16 @@ export const rateLimitStore = {
     const multi = redis.multi();
     const now = Date.now();
     const windowStart = now - windowSeconds * 1000;
-    
+
     multi.zremrangebyscore(key, 0, windowStart);
     multi.zadd(key, now, `${now}-${Math.random()}`);
     multi.zcard(key);
     multi.pexpire(key, windowSeconds * 1000);
-    
+
     const results = await multi.exec();
     const count = results?.[2]?.[1] as number || 0;
     const resetTime = now + windowSeconds * 1000;
-    
+
     return { count, resetTime };
   },
 };
