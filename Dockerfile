@@ -7,6 +7,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json* ./
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 
 # Build the source code
