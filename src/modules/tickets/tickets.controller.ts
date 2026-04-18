@@ -26,9 +26,10 @@ const updateTicketSchema = z.object({
 const listTicketsQuerySchema = z.object({
   page: z.string().transform(Number).default('1'),
   limit: z.string().transform(Number).default('20'),
-  status: z.nativeEnum(TicketStatus).optional(),
-  priority: z.nativeEnum(TicketPriority).optional(),
-  search: z.string().optional(),
+  status: z.string().optional().transform(v => v || undefined).pipe(z.nativeEnum(TicketStatus).optional()),
+  priority: z.string().optional().transform(v => v || undefined).pipe(z.nativeEnum(TicketPriority).optional()),
+  category: z.string().optional().transform(v => v || undefined),
+  search: z.string().optional().transform(v => v || undefined),
 });
 
 export const ticketsController = {
@@ -84,6 +85,7 @@ export const ticketsController = {
         tenantId: req.user!.tenantId,
         status: queryValidation.data.status,
         priority: queryValidation.data.priority,
+        category: queryValidation.data.category,
         search: queryValidation.data.search,
       },
       {
