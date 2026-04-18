@@ -52,7 +52,7 @@ export const documentsController = {
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const document = await documentsService.getDocumentById(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.tenantId!
     );
@@ -87,7 +87,7 @@ export const documentsController = {
     }
 
     const document = await documentsService.updateDocument(
-      req.params.id,
+      req.params.id!,
       validation.data,
       req.user!.id,
       req.user!.tenantId!
@@ -101,7 +101,7 @@ export const documentsController = {
 
   delete: asyncHandler(async (req: Request, res: Response) => {
     await documentsService.deleteDocument(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.tenantId!
     );
@@ -119,7 +119,7 @@ export const documentsController = {
     }
 
     const link = await documentsService.linkToTicket(
-      req.params.id,
+      req.params.id!,
       validation.data.ticketId,
       validation.data.linkType,
       req.user!.id,
@@ -139,7 +139,7 @@ export const documentsController = {
     }
 
     await documentsService.unlinkFromTicket(
-      req.params.id,
+      req.params.id!,
       ticketId,
       req.user!.id,
       req.user!.tenantId!

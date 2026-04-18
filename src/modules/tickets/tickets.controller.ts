@@ -20,7 +20,7 @@ const updateTicketSchema = z.object({
   priority: z.nativeEnum(TicketPriority).optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  assigneeId: z.string().uuid().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable().transform(v => v ?? undefined),
 });
 
 const listTicketsQuerySchema = z.object({
@@ -62,10 +62,10 @@ export const ticketsController = {
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const ticket = await ticketsService.getTicketById(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -110,11 +110,11 @@ export const ticketsController = {
     }
 
     const ticket = await ticketsService.updateTicket(
-      req.params.id,
+      req.params.id!,
       validation.data,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -124,7 +124,7 @@ export const ticketsController = {
   }),
 
   delete: asyncHandler(async (req: Request, res: Response) => {
-    await ticketsService.deleteTicket(req.params.id, req.user!.id, req.user!.role);
+    await ticketsService.deleteTicket(req.params.id!, req.user!.id, req.user!.role);
 
     res.json({
       success: true,
@@ -134,10 +134,10 @@ export const ticketsController = {
 
   runAiTriage: asyncHandler(async (req: Request, res: Response) => {
     const result = await ticketsService.runAiTriage(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({
@@ -148,10 +148,10 @@ export const ticketsController = {
 
   getSimilar: asyncHandler(async (req: Request, res: Response) => {
     const similar = await ticketsService.getSimilarTickets(
-      req.params.id,
+      req.params.id!,
       req.user!.id,
       req.user!.role,
-      req.user!.tenantId
+      req.user!.tenantId!
     );
 
     res.json({

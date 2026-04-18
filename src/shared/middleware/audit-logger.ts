@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import logger from '../utils/logger';
 
@@ -52,8 +53,8 @@ export async function logAudit(data: AuditLogData, req?: Request): Promise<void>
         action: data.action,
         entityType: data.entityType,
         entityId: data.entityId,
-        oldData: data.oldData || {},
-        newData: data.newData || {},
+        oldData: (data.oldData || {}) as Prisma.InputJsonValue,
+        newData: (data.newData || {}) as Prisma.InputJsonValue,
         ipAddress: req?.ip,
         userAgent: req?.headers['user-agent'],
       },

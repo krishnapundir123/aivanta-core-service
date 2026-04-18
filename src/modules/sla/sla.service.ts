@@ -46,7 +46,7 @@ export async function calculateSlaDeadline(
   }[priority];
 
   const businessHours = slaConfig.businessHours as BusinessHours;
-  const holidays = (slaConfig.holidays as Holiday[]) || [];
+  const holidays = (slaConfig.holidays as unknown as Holiday[]) || [];
 
   return addBusinessMinutes(startTime, responseMinutes, businessHours, holidays);
 }
@@ -64,9 +64,9 @@ function addBusinessMinutes(
   let current = new Date(start);
 
   while (remainingMinutes > 0) {
-    const dayOfWeek = dayNames[current.getDay()];
+    const dayOfWeek = dayNames[current.getDay()]!;
     const dayHours = businessHours[dayOfWeek];
-    const dateStr = current.toISOString().split('T')[0];
+    const dateStr = current.toISOString().split('T')[0]!;
 
     // Skip weekends and holidays
     if (!dayHours || holidayDates.has(dateStr)) {
@@ -153,7 +153,7 @@ export async function checkSlaBreaches(): Promise<void> {
     logger.error(`Ticket ${ticket.id} SLA breached!`, {
       ticketId: ticket.id,
       deadline: ticket.slaDeadline,
-      hoursOverdue: Math.floor((now.getTime() - ticket.slaDeadline.getTime()) / 3600000),
+      hoursOverdue: Math.floor((now.getTime() - ticket.slaDeadline!.getTime()) / 3600000),
     });
 
     // TODO: Escalate and notify

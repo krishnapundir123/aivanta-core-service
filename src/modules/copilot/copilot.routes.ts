@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { authenticate } from '../../shared/middleware/authentication';
 import { asyncHandler } from '../../shared/utils/async-handler';
@@ -43,7 +44,7 @@ router.post('/query', asyncHandler(async (req, res) => {
     session = await prisma.copilotSession.create({
       data: {
         userId,
-        context,
+        context: context as Prisma.InputJsonValue,
         messages: [],
       },
     });
@@ -62,8 +63,8 @@ router.post('/query', asyncHandler(async (req, res) => {
   await prisma.copilotSession.update({
     where: { id: session.id },
     data: {
-      messages: updatedMessages as unknown[],
-      context: { ...session.context as Record<string, unknown>, ...response.context },
+      messages: updatedMessages as Prisma.InputJsonValue[],
+      context: { ...(session.context as Record<string, unknown>), ...response.context } as Prisma.InputJsonValue,
     },
   });
 

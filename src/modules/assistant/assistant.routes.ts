@@ -150,7 +150,7 @@ router.post('/create-ticket', asyncHandler(async (req, res) => {
         email: session.customerEmail,
         passwordHash: await hashPassword(tempPassword),
         firstName: 'Customer',
-        lastName: session.customerEmail.split('@')[0],
+        lastName: session.customerEmail.split('@')[0] || '',
         role: 'CLIENT_ADMIN',
         tenantId: session.tenantId,
       },
@@ -166,6 +166,9 @@ router.post('/create-ticket', asyncHandler(async (req, res) => {
   }, user.id);
 
   // Update session
+  if (!ticket) {
+    throw new ValidationError('Failed to create ticket');
+  }
   await prisma.assistantSession.update({
     where: { id: sessionId },
     data: {

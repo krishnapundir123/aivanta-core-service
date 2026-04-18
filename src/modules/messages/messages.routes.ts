@@ -29,13 +29,13 @@ router.post('/', asyncHandler(async (req, res) => {
 
   const message = await messagesService.createMessage(
     {
-      ticketId: req.params.ticketId,
+      ticketId: req.params.ticketId!,
       authorId: req.user!.id,
       ...validation.data,
     },
     req.user!.id,
     req.user!.role,
-    req.user!.tenantId
+    req.user!.tenantId!
   );
 
   res.status(201).json({
@@ -47,10 +47,10 @@ router.post('/', asyncHandler(async (req, res) => {
 // Get all messages for a ticket
 router.get('/', asyncHandler(async (req, res) => {
   const messages = await messagesService.getTicketMessages(
-    req.params.ticketId,
+    req.params.ticketId!,
     req.user!.id,
     req.user!.role,
-    req.user!.tenantId
+    req.user!.tenantId!
   );
 
   res.json({
@@ -67,11 +67,11 @@ router.patch('/:messageId', asyncHandler(async (req, res) => {
   }
 
   const message = await messagesService.updateMessage(
-    req.params.messageId,
+    req.params.messageId!,
     validation.data.content,
     req.user!.id,
     req.user!.role,
-    req.user!.tenantId
+    req.user!.tenantId!
   );
 
   res.json({
@@ -83,10 +83,10 @@ router.patch('/:messageId', asyncHandler(async (req, res) => {
 // Delete message
 router.delete('/:messageId', asyncHandler(async (req, res) => {
   await messagesService.deleteMessage(
-    req.params.messageId,
+    req.params.messageId!,
     req.user!.id,
     req.user!.role,
-    req.user!.tenantId
+    req.user!.tenantId!
   );
 
   res.json({

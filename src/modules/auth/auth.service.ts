@@ -95,7 +95,7 @@ export const authService = {
     const expiresAt = new Date();
     const match = refreshExpiresIn.match(/(\d+)([d])/);
     if (match) {
-      expiresAt.setDate(expiresAt.getDate() + parseInt(match[1]));
+      expiresAt.setDate(expiresAt.getDate() + parseInt(match[1]!));
     } else {
       expiresAt.setDate(expiresAt.getDate() + 7);
     }
