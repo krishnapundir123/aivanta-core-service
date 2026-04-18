@@ -79,7 +79,7 @@ export const ticketsService = {
   },
 
   async listTickets(
-    filters: { tenantId?: string; status?: TicketStatus; priority?: TicketPriority; search?: string },
+    filters: { tenantId?: string; status?: TicketStatus; priority?: TicketPriority; category?: string; search?: string },
     pagination: { page: number; limit: number },
     userId: string,
     userRole: string

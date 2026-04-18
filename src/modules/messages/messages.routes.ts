@@ -77,7 +77,7 @@ router.patch('/:messageId', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: message,
-  }));
+  });
 }));
 
 // Delete message
