@@ -4,3 +4,6 @@
 /.env.local
 /git
 /build
+/package-lock.json
+/prisma/migrations
+/docs
