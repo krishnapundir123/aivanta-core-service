@@ -8,7 +8,7 @@ interface ErrorResponse {
   error: {
     code: string;
     message: string;
-    errors?: Record<string, string>;
+    errors?: Record<string, string | string[]>;
     stack?: string;
   };
 }
@@ -22,7 +22,7 @@ export function errorHandler(
   let statusCode = 500;
   let errorCode = 'INTERNAL_ERROR';
   let message = 'An unexpected error occurred';
-  let errors: Record<string, string> | undefined;
+  let errors: Record<string, string | string[]> | undefined;
 
   // Handle known application errors
   if (err instanceof AppError) {
@@ -35,7 +35,7 @@ export function errorHandler(
     }
   } else if (err.name === 'PrismaClientKnownRequestError') {
     // Handle Prisma errors
-    const prismaError = err as { code: string; meta?: { target?: string[] } };
+    const prismaError = err as unknown as { code: string; meta?: { target?: string[] } };
     
     switch (prismaError.code) {
       case 'P2002':
@@ -60,7 +60,7 @@ export function errorHandler(
     statusCode = 400;
     errorCode = 'VALIDATION_ERROR';
     message = 'Validation failed';
-    const zodError = err as { errors: Array<{ path: (string | number)[]; message: string }> };
+    const zodError = err as unknown as { errors: Array<{ path: (string | number)[]; message: string }> };
     errors = zodError.errors.reduce((acc, curr) => {
       const path = curr.path.join('.');
       acc[path] = curr.message;

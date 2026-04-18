@@ -31,12 +31,12 @@ export function encrypt(text: string, key: string): string {
 
 export function decrypt(encryptedData: string, key: string): string {
   const parts = encryptedData.split(':');
-  const iv = Buffer.from(parts[0], 'hex');
-  const authTag = Buffer.from(parts[1], 'hex');
-  const encrypted = parts[2];
+  const iv = Buffer.from(parts[0]!, 'hex');
+  const authTag = Buffer.from(parts[1]!, 'hex');
+  const encrypted = parts[2]!;
   const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key.padEnd(32).slice(0, 32)), iv);
   decipher.setAuthTag(authTag);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  let decrypted: string = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
 }

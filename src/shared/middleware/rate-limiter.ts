@@ -10,7 +10,7 @@ function createStore() {
     return undefined;
   }
   return new RedisStore({
-    sendCommand: (...args: string[]) => redis.call(...args),
+    sendCommand: ((...args: [string, ...string[]]) => redis.call(...args)) as any,
   });
 }
 

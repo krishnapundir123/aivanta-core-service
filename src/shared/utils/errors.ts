@@ -19,11 +19,18 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  public readonly errors: Record<string, string>;
+  public readonly errors: Record<string, string | string[]>;
 
-  constructor(message: string, errors: Record<string, string> = {}) {
+  constructor(message: string, errors?: Record<string, string[] | undefined>) {
     super(message, 400, 'VALIDATION_ERROR');
-    this.errors = errors;
+    this.errors = {};
+    if (errors) {
+      for (const [key, value] of Object.entries(errors)) {
+        if (value !== undefined) {
+          this.errors[key] = value;
+        }
+      }
+    }
   }
 }
 

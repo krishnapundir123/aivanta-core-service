@@ -60,7 +60,11 @@ export const ticketsService = {
       aiTriage: aiTriage?.category,
     });
 
-    return ticketsRepository.findById(ticket.id)!;
+    const created = await ticketsRepository.findById(ticket.id);
+    if (!created) {
+      throw new NotFoundError('Ticket');
+    }
+    return created;
   },
 
   async getTicketById(id: string, userId: string, userRole: string, tenantId?: string) {
@@ -210,15 +214,15 @@ export const ticketsService = {
   },
 
   async getSimilarTickets(id: string, userId: string, userRole: string, tenantId?: string) {
-    const ticket = await this.getTicketById(id, userId, userRole, tenantId);
+    const embedding = await ticketsRepository.getEmbedding(id);
 
-    if (!ticket.embedding) {
+    if (!embedding) {
       // Run triage to generate embedding
       const triageResult = await this.runAiTriage(id, userId, userRole, tenantId);
       return triageResult.similarTickets;
     }
 
-    return ticketsRepository.findSimilar(ticket.embedding as unknown as number[], 0.8, id);
+    return ticketsRepository.findSimilar(embedding, 0.8, id);
   },
 
   async getTicketStats(tenantId: string, userRole: string) {
