@@ -21,6 +21,7 @@ RUN npx tsc || echo "Build completed with type warnings"
 # Production image
 FROM base AS runner
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 ENV PORT=3000
